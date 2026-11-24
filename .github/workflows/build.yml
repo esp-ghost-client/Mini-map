@@ -8,19 +8,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Unzip project
         run: unzip -q cmd-world-explorer-src*.zip -d proj
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.2.1"
+
       - name: Build
         working-directory: proj
-        run: gradle build --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
+        run: |
+          set +e
+          gradle build --no-daemon --console=plain > ../build.log 2>&1
+          code=$?
+          {
+            echo '## Compile errors'
+            echo '```'
+            grep -A2 'error:' ../build.log | head -150
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
         with:
           name: cmd_world_explorer-jar
           path: proj/build/libs/*.jar
